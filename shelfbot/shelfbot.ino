@@ -6,12 +6,14 @@
  * --------------------------------------------
  */
 
-//PINS
+
 int request = 2; //Interupt pin for raise / lower request signals
-int motor_direction_A = 5;
-int motor_direction_B = 6;
-int drawer_relay = 7;
-int lift_relay = 8;
+//RELAY PINS
+int motor_direction_A = 4;
+int motor_direction_B = 5;
+int drawer_relay = 6;
+int lift_relay = 7;
+//INPUT PINS
 int drawer_in_limit = 9;
 int drawer_out_limit = 10;
 int lift_up_limit = 11;
@@ -41,9 +43,9 @@ void setup() {
   // Setup the pins
   attachInterrupt(request, requestChange, CHANGE);
   pinMode(drawer_relay, OUTPUT);
-  digitalWrite(drawer_relay, LOW);
+  digitalWrite(drawer_relay, HIGH);
   pinMode(lift_relay, OUTPUT);
-  digitalWrite(lift_relay, LOW);
+  digitalWrite(lift_relay, HIGH);
   pinMode(drawer_in_limit, INPUT_PULLUP);
   pinMode(drawer_out_limit, INPUT_PULLUP);
   pinMode(lift_up_limit, INPUT_PULLUP);
@@ -51,9 +53,9 @@ void setup() {
   pinMode(left_weight, INPUT);
   pinMode(right_weight, INPUT);
   pinMode(motor_direction_A, OUTPUT);
-  digitalWrite(motor_direction_A, LOW);
+  digitalWrite(motor_direction_A, HIGH);
   pinMode(motor_direction_B, OUTPUT);
-  digitalWrite(motor_direction_B, LOW);
+  digitalWrite(motor_direction_B, HIGH);
   // Setup the motion timers
   
   timer.disable(drawerTimer);
@@ -79,31 +81,37 @@ void loop() {
         Serial.println("Open drawer requested.");
         openDrawer();
       }
+      break;
       case 99: {
         cancelMotion();
         Serial.println("Close drawer requested.");
         closeDrawer();
       }
+      break;
       case 108: {
         cancelMotion();
         Serial.println("Lower lift requested.");
         lowerLift();
       }
+      break;
       case 114: {
         cancelMotion();
         Serial.println("Raise lift requested.");
         raiseLift();
       }
+      break;
       case 100: {
         if (error = true) {
           cancelMotion();
           Serial.println("Error state reset.");
           error = false;
         }
+        break;
       }
       case 104: {
         //ADD HELP CODE HERE
       }
+      break;
     }
   }
   delay(500);
@@ -141,12 +149,14 @@ bool openDrawer() {
     if (motorForward()){
       Serial.println("OK"); //Motors are in forward relay switching - start open
       Serial.print("Opening the drawer... ");
-      drawerTimer = timer.setTimeout(10000, drawerTimeout); //Start the 10 second timer
       startTime = millis();
       while (digitalRead(drawer_out_limit) == HIGH && error==false){
-        digitalWrite(drawer_relay, HIGH);
+        digitalWrite(drawer_relay, LOW);
+        if ((millis()-startTime) > 10000){
+          drawerTimeout();
+        }
       }
-      digitalWrite(drawer_relay, LOW);
+      digitalWrite(drawer_relay, HIGH);
       if (error == true){
         Serial.println ("ERROR 1");
         return false;
@@ -155,7 +165,6 @@ bool openDrawer() {
         stopTime = millis() - startTime;
         Serial.print(stopTime/1000);
         Serial.println("sec");
-        timer.deleteTimer(drawerTimer);
         return true;
       }
       
@@ -184,12 +193,14 @@ bool lowerLift() {
     if (motorForward()){
       Serial.println ("OK"); //Motors are forward start lowering the lift
       Serial.print("Lowering the lift... ");
-      liftTimer = timer.setTimeout(10000, liftTimeout); //Start the 10 second timer
       startTime = millis();
       while (digitalRead(lift_down_limit) == HIGH && error==false){
-        digitalWrite(lift_relay, HIGH);
+        digitalWrite(lift_relay, LOW);
+                if ((millis()-startTime) > 10000){
+          liftTimeout();
+        }
       }
-      digitalWrite(lift_relay, LOW);
+      digitalWrite(lift_relay, HIGH);
       if (error == true){
         Serial.println ("ERROR 2");
         return false;
@@ -198,7 +209,6 @@ bool lowerLift() {
         stopTime = millis() - startTime;
         Serial.print(stopTime/1000);
         Serial.println("sec");
-        timer.deleteTimer(liftTimer);
         return true;
       }
       
@@ -219,6 +229,9 @@ bool raiseLift() {
 }
 
 bool motorForward() {
+  digitalWrite(motor_direction_A, LOW);
+  digitalWrite(motor_direction_B, LOW);
+  return true;
 }
 
 bool motorReverse() {
@@ -236,8 +249,8 @@ void liftTimeout() {
 }
 
 void cancelMotion(){
-  digitalWrite(drawer_relay, LOW);
-  digitalWrite(lift_relay, LOW);
+  digitalWrite(drawer_relay, HIGH);
+  digitalWrite(lift_relay, HIGH);
   //Determine if motion was indeed canceled and pause to prevent mechanical damage
   if (timer.isEnabled(drawerTimer) || timer.isEnabled(liftTimer)){
     Serial.println("CANCELED");
