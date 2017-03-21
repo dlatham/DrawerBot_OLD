@@ -27,6 +27,7 @@ int error_code = 0;
 int incomingByte = 0; //Incoming serial data
 int drawerTimer;
 int liftTimer;
+bool motion = false;
 unsigned long startTime;
 unsigned long stopTime;
 SimpleTimer timer;
@@ -151,6 +152,7 @@ bool openDrawer() {
       Serial.print("Opening the drawer... ");
       startTime = millis();
       while (digitalRead(drawer_out_limit) == HIGH && error==false){
+        motion = true;
         digitalWrite(drawer_relay, LOW);
         if ((millis()-startTime) > 10000){
           drawerTimeout();
@@ -159,12 +161,18 @@ bool openDrawer() {
       digitalWrite(drawer_relay, HIGH);
       if (error == true){
         Serial.println ("ERROR 1");
+        //Pause for 2 seconds before telling the interrupt that motion stopped (just in case)
+        delay(2000);
+        motion = false;
         return false;
       } else {
         Serial.print("OK - Completed in ");
         stopTime = millis() - startTime;
         Serial.print(stopTime/1000);
         Serial.println("sec");
+        //Pause for 2 seconds before telling the interrupt that motion stopped (just in case)
+        delay(2000);
+        motion = false;
         return true;
       }
       
@@ -235,6 +243,9 @@ bool motorForward() {
 }
 
 bool motorReverse() {
+  digitalWrite(motor_direction_A, HIGH);
+  digitalWrite(motor_direction_B, HIGH);
+  return true;
 }
 
 void drawerTimeout() {
@@ -252,7 +263,7 @@ void cancelMotion(){
   digitalWrite(drawer_relay, HIGH);
   digitalWrite(lift_relay, HIGH);
   //Determine if motion was indeed canceled and pause to prevent mechanical damage
-  if (timer.isEnabled(drawerTimer) || timer.isEnabled(liftTimer)){
+  if (motion == true){
     Serial.println("CANCELED");
     timer.deleteTimer(drawerTimer);
     timer.deleteTimer(liftTimer);
