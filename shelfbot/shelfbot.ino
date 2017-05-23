@@ -1,4 +1,3 @@
-#include <SimpleTimer.h>
 #include <EEPROM.h>
 /*
  * Automated Shelf by Dave Latham
@@ -28,9 +27,8 @@ int incomingByte = 0; //Incoming serial data
 int drawerTimer;
 int liftTimer;
 bool motion = false;
-unsigned long startTime;
-unsigned long stopTime;
-SimpleTimer timer;
+int startTime;
+int stopTime;
 /*
  * ERROR CODES:
  * #1 - Drawer movement timeout
@@ -60,11 +58,7 @@ void setup() {
   digitalWrite(motor_direction_A, HIGH);
   pinMode(motor_direction_B, OUTPUT);
   digitalWrite(motor_direction_B, HIGH);
-  // Setup the motion timers
-  
-  timer.disable(drawerTimer);
-  liftTimer = timer.setTimeout(10000, liftTimeout);
-  timer.disable(liftTimer);
+
   // Setup the serial monitor and print welcome
   Serial.begin(9600);
   Serial.print("ShelfBot version ");
@@ -296,14 +290,123 @@ void calibrate() {
   Serial.println(analogRead(lift_sense));
   Serial.println("------------------------------");
   Serial.println("Ready to calibrate the sensor limits.");
-  Serial.println("[D]rawer sensor, [L]ift sensor, [C]ancel");
+  Serial.println("[d]rawer sensor, [l]ift sensor, [c]ancel or any other key to repeat sensor read.");
 
   //Wait here for input
   while(Serial.available() == 0) { }
- 
+  incomingByte = Serial.read();
 
+  //Parse the menu selection
+  switch (incomingByte){
+      case 100: { // d
+        cancelMotion();
+        Serial.println("Drawer sensor calibration requested.");
+        calibrateDrawer();
+      }
+      break;
+      case 108: { // l
+        cancelMotion();
+        Serial.println("Lift sensor calibration requested.");
+        calibrateLift();
+      }
+      break;
+      case 99: { // c
+        Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [s]ensor calibration, [h]elp");
+        Serial.println("READY");
+        return;
+      }
+      break;
+  }
+  calibrate(); //Return to the top of the function if any key other than d,l, or c were presseed 
+}
 
+void calibrateDrawer(){
+  //First check to see if the lift is down and see if we want to raise it or calibrate that first
+  if(analogRead(lift_sense) < 500) { //less than somewhere around 2.5v on the sense pin
+    Serial.println("WARNING: It appears as though the lift is down so moving the drawer could cause damage.");
+    Serial.println("[r]aise the lift, [c]ontinue with drawer calibration, any other key to cancel.");
+    
+    //Wait for input
+    while(Serial.available() == 0) { }
+    incomingByte = Serial.read();
+    if(incomingByte==114 && lift_limit_in != 0) {
+      if(!raiseLift()) {
+        return;
+      } 
+      
+    } else if (incomingByte==114 && lift_limit_in==0){
+      Serial.println("Unable to raise the lift because it hasn't been calibrated yet. You can calibrate the lift first, raise it manually, or re-execute drawer calibration and ignore the warning.");
+      delay(300);
+      Serial.println("");
+      return;
+    } else if (incomingByte==99){
+      Serial.println("WARNING, WARNING: You are choosing to move the drawer despite the sensors measuring the lift as being down. This could cause damage.");
+    } else {
+      return;
+    }
+  }
 
+  //Select order of calibration
+  Serial.println("NOTICE: Please confirm the lift is up and it is safe to move the drawer.");
+  Serial.println("Set the drawer [o]pen limit, [c]losed limit or any other key to cancel.");
+
+  //Wait for input
+  while(Serial.available() == 0) { }
+  incomingByte = Serial.read();
+
+  //Calibration selection start
+  if(incomingByte==111){ // o for the open limit
+    Serial.println("Ready to open the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.");
+    do {
+      Serial.print("Current sensor reading: ");
+      Serial.println(analogRead(drawer_sense));
+      Serial.println("[o]pen drawer, [s]ave current reading, [c]ancel");
+      while(Serial.available() == 0) { }
+      incomingByte = Serial.read();
+      if(incomingByte==111){ // o for open the drawer
+        // Open the drawer
+        Serial.println("Starting drawer open.");
+        Serial.print("Confirming motor relay forward... ");
+        if (motorForward()){
+          Serial.println("OK"); //Motors are in forward relay switching - start open
+          Serial.print("Opening the drawer... ");
+          startTime = millis();
+          while (Serial.available()==0){
+            motion = true;
+            digitalWrite(drawer_relay, LOW);
+            if ((millis()-startTime) > 10000){
+              drawerTimeout();
+              return;
+            }
+            Serial.print(analogRead(drawer_sense));
+            Serial.println(" PRESS ANY KEY TO STOP");
+          }
+          digitalWrite(drawer_relay, HIGH);
+        
+        } else {
+          Serial.println("ERROR: Motor direction control failure.");
+          return;
+        }
+        delay(300);
+        // Go back to the top of the do
+        
+    } else if(incomingByte==115){ //s for save the current reading
+      drawer_limit_out == analogRead(drawer_sense);
+      EEPROM.write(drawer_limit_out, 1);
+      Serial.println("New drawer out limit SAVED!");
+      delay(300);
+      return;
+    } else {
+      return;
+    }
+    
+  } while(2>1);
+  }
+  
+  
+}
+
+void calibrateLift(){
   
 }
 
@@ -313,8 +416,6 @@ void cancelMotion(){
   //Determine if motion was indeed canceled and pause to prevent mechanical damage
   if (motion == true){
     Serial.println("CANCELED");
-    timer.deleteTimer(drawerTimer);
-    timer.deleteTimer(liftTimer);
     delay(3000); 
   }
 }
