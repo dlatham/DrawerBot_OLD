@@ -1,12 +1,14 @@
 #include <SimpleTimer.h>
+#include <EEPROM.h>
 /*
  * Automated Shelf by Dave Latham
- * Version 0.1
- * 2 March 2017
+ * Version 0.2 - in-progress
+ * This version will substitute the mechanical limit switches for an IR distance sensor and add a calibration routine
+ * 22 May 2017
  * --------------------------------------------
  */
 
-
+float vers = 0.2;
 int request = 2; //Interupt pin for raise / lower request signals
 //RELAY PINS
 int motor_direction_A = 4;
@@ -14,10 +16,8 @@ int motor_direction_B = 5;
 int drawer_relay = 6;
 int lift_relay = 7;
 //INPUT PINS
-int drawer_in_limit = 9;
-int drawer_out_limit = 10;
-int lift_up_limit = 11;
-int lift_down_limit = 12;
+int drawer_sense = A0;
+int lift_sense = A1;
 int left_weight = 13;
 int right_weight = 14;
 //VARIABLES
@@ -38,6 +38,11 @@ SimpleTimer timer;
  * #3 - Motor relay error
  * 
  */
+ //STORED EEPROM LIMIT VALUES
+ int lift_limit_out = EEPROM.read(0);
+ int lift_limit_in = EEPROM.read(1);
+ int drawer_limit_out = EEPROM.read(2);
+ int drawer_limit_in = EEPROM.read(3);
 
 
 void setup() {
@@ -47,10 +52,8 @@ void setup() {
   digitalWrite(drawer_relay, HIGH);
   pinMode(lift_relay, OUTPUT);
   digitalWrite(lift_relay, HIGH);
-  pinMode(drawer_in_limit, INPUT_PULLUP);
-  pinMode(drawer_out_limit, INPUT_PULLUP);
-  pinMode(lift_up_limit, INPUT_PULLUP);
-  pinMode(lift_down_limit, INPUT_PULLUP);
+  pinMode(drawer_sense, INPUT);
+  pinMode(lift_sense, INPUT);
   pinMode(left_weight, INPUT);
   pinMode(right_weight, INPUT);
   pinMode(motor_direction_A, OUTPUT);
@@ -64,11 +67,12 @@ void setup() {
   timer.disable(liftTimer);
   // Setup the serial monitor and print welcome
   Serial.begin(9600);
-  Serial.println("ShelfBot version 0.1");
+  Serial.print("ShelfBot version ");
+  Serial.println(vers);
   Serial.println("--------------------");
   Serial.print("Listening for state change on interrupt PIN ");
   Serial.println(request);
-  Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [h]elp");
+  Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [s]ensor calibration, [h]elp");
   Serial.println("READY");
 }
 
@@ -109,6 +113,12 @@ void loop() {
         }
         break;
       }
+      case 115: {
+        cancelMotion();
+        Serial.println("Sensor calibration requested.");
+        calibrate();
+      }
+      break;
       case 104: {
         //ADD HELP CODE HERE
       }
@@ -144,14 +154,14 @@ void requestChange(){
 // Drawer motion controllers start here--------------------------------------------->
 bool openDrawer() {
   // Confirm the drawer isn't out first
-  if (digitalRead(drawer_out_limit) == HIGH){
+  if (digitalRead(analogRead(drawer_sense)<drawer_limit_in)){
     Serial.println("Starting drawer open.");
     Serial.print("Confirming motor relay forward... ");
     if (motorForward()){
       Serial.println("OK"); //Motors are in forward relay switching - start open
       Serial.print("Opening the drawer... ");
       startTime = millis();
-      while (digitalRead(drawer_out_limit) == HIGH && error==false){
+      while (analogRead(drawer_sense) > drawer_limit_out && error==false){
         motion = true;
         digitalWrite(drawer_relay, LOW);
         if ((millis()-startTime) > 10000){
@@ -195,14 +205,14 @@ bool closeDrawer() {
 
 bool lowerLift() {
   //Confirm the lift isn't lowered already
-  if (digitalRead(lift_down_limit) == HIGH){
+  if (analogRead(lift_sense)<lift_limit_in){
     Serial.println("Starting lift lower.");
     Serial.print("Confirming motors in forward...");
     if (motorForward()){
       Serial.println ("OK"); //Motors are forward start lowering the lift
       Serial.print("Lowering the lift... ");
       startTime = millis();
-      while (digitalRead(lift_down_limit) == HIGH && error==false){
+      while (analogRead(lift_sense) > lift_limit_out && error==false){
         digitalWrite(lift_relay, LOW);
                 if ((millis()-startTime) > 10000){
           liftTimeout();
@@ -257,6 +267,44 @@ void liftTimeout() {
   error = true;
   error_code = 2;
   //MAY NEED TO ADD TIMER REENABLE HERE
+}
+
+void calibrate() {
+  Serial.println("CURRENT SENSOR LIMITS:");
+  Serial.println("------------------------------");
+  Serial.print("\t");
+  Serial.print("OPEN");
+  Serial.print("\t");
+  Serial.print("CLOSE");
+  Serial.print("\t");
+  Serial.println("CURRENT");
+ 
+  Serial.print("Drawer:");
+  Serial.print("\t");
+  Serial.print(drawer_limit_out);
+  Serial.print("\t");
+  Serial.print(drawer_limit_in);
+  Serial.print("\t");
+  Serial.println(analogRead(drawer_sense));
+  
+  Serial.print("Lift:");
+  Serial.print("\t");
+  Serial.print(lift_limit_out);
+  Serial.print("\t");
+  Serial.print(lift_limit_in);
+  Serial.print("\t");
+  Serial.println(analogRead(lift_sense));
+  Serial.println("------------------------------");
+  Serial.println("Ready to calibrate the sensor limits.");
+  Serial.println("[D]rawer sensor, [L]ift sensor, [C]ancel");
+
+  //Wait here for input
+  while(Serial.available() == 0) { }
+ 
+
+
+
+  
 }
 
 void cancelMotion(){
