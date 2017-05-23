@@ -354,13 +354,13 @@ void calibrateDrawer(){
   while(Serial.available() == 0) { }
   incomingByte = Serial.read();
 
-  //Calibration selection start
+  //Calibration selection start - start with parsing the open or close selections and then loop the open/close and save code until they exit
   if(incomingByte==111){ // o for the open limit
     Serial.println("Ready to open the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.");
     do {
       Serial.print("Current sensor reading: ");
       Serial.println(analogRead(drawer_sense));
-      Serial.println("[o]pen drawer, [s]ave current reading, [c]ancel");
+      Serial.println("[o]pen drawer, [s]ave current reading, any other key to cancel.");
       while(Serial.available() == 0) { }
       incomingByte = Serial.read();
       if(incomingByte==111){ // o for open the drawer
@@ -390,17 +390,67 @@ void calibrateDrawer(){
         delay(300);
         // Go back to the top of the do
         
-    } else if(incomingByte==115){ //s for save the current reading
-      drawer_limit_out == analogRead(drawer_sense);
-      EEPROM.write(drawer_limit_out, 1);
-      Serial.println("New drawer out limit SAVED!");
-      delay(300);
-      return;
-    } else {
-      return;
-    }
+      } else if(incomingByte==115){ //s for save the current reading
+        drawer_limit_out == analogRead(drawer_sense);
+        EEPROM.write(drawer_limit_out, 1);
+        Serial.println("New drawer out limit SAVED!");
+        delay(300);
+        return;
+      } else {
+        return;
+      }
     
-  } while(2>1);
+    } while(2>1);
+
+  
+  } else if(incomingByte==99){ // c for setting the closed drawer limit
+    Serial.println("Ready to close the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.");
+    do {
+      Serial.print("Current sensor reading: ");
+      Serial.println(analogRead(drawer_sense));
+      Serial.println("[c]lose drawer, [s]ave current reading, any other key to cancel");
+      while(Serial.available() == 0) { }
+      incomingByte = Serial.read();
+      if(incomingByte==99){ // c for close the drawer
+        // Close the drawer
+        Serial.println("Starting drawer close.");
+        Serial.print("Confirming motor relay reverse... ");
+        if (motorReverse()){
+          Serial.println("OK"); //Motors are in reverse relay switching - start close
+          Serial.print("Closing the drawer... ");
+          startTime = millis();
+          while (Serial.available()==0){
+            motion = true;
+            digitalWrite(drawer_relay, LOW);
+            if ((millis()-startTime) > 10000){
+              drawerTimeout();
+              return;
+            }
+            Serial.print(analogRead(drawer_sense));
+            Serial.println(" PRESS ANY KEY TO STOP");
+          }
+          digitalWrite(drawer_relay, HIGH);
+        
+        } else {
+          Serial.println("ERROR: Motor direction control failure.");
+          return;
+        }
+        delay(300);
+        // Go back to the top of the do
+        
+      } else if(incomingByte==115){ //s for save the current reading
+        drawer_limit_in == analogRead(drawer_sense);
+        EEPROM.write(drawer_limit_out, 0);
+        Serial.println("New drawer in limit SAVED!");
+        delay(300);
+        return;
+      } else {
+        return;
+      }
+    
+    } while(2>1);
+
+    
   }
   
   
