@@ -263,6 +263,7 @@ void liftTimeout() {
   //MAY NEED TO ADD TIMER REENABLE HERE
 }
 
+//-------------------------------------CALIBRATION CODE STARTS HERE--------------------->
 void calibrate() {
   Serial.println("CURRENT SENSOR LIMITS:");
   Serial.println("------------------------------");
@@ -320,6 +321,7 @@ void calibrate() {
   calibrate(); //Return to the top of the function if any key other than d,l, or c were presseed 
 }
 
+//-------------------DRAWER CALIBRATION---------------------->
 void calibrateDrawer(){
   //First check to see if the lift is down and see if we want to raise it or calibrate that first
   if(analogRead(lift_sense) < 500) { //less than somewhere around 2.5v on the sense pin
@@ -456,7 +458,9 @@ void calibrateDrawer(){
   
 }
 
+//-----------------LIFT CALIBRATION------------------>
 void calibrateLift(){
+//LETS GET THIS RIGHT FOR DRAWER AND THEN COPY THE CODE HERE
   
 }
 
