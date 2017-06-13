@@ -29,6 +29,8 @@ int liftTimer;
 bool motion = false;
 int startTime;
 int stopTime;
+
+
 /*
  * ERROR CODES:
  * #1 - Drawer movement timeout
@@ -37,10 +39,14 @@ int stopTime;
  * 
  */
  //STORED EEPROM LIMIT VALUES
- int lift_limit_out = EEPROM.read(0);
- int lift_limit_in = EEPROM.read(1);
- int drawer_limit_out = EEPROM.read(2);
- int drawer_limit_in = EEPROM.read(3);
+ int lift_down = 0;
+ int lift_up = 1;
+ int drawer_out = 2;
+ int drawer_in = 3;
+ int lift_down_limit = EEPROM.read(0);
+ int lift_up_limit = EEPROM.read(1);
+ int drawer_out_limit = EEPROM.read(2);
+ int drawer_in_limit = EEPROM.read(3);
 
 
 void setup() {
@@ -148,14 +154,14 @@ void requestChange(){
 // Drawer motion controllers start here--------------------------------------------->
 bool openDrawer() {
   // Confirm the drawer isn't out first
-  if (digitalRead(analogRead(drawer_sense)<drawer_limit_in)){
+  if (digitalRead(analogRead(drawer_sense)<drawer_in_limit)){
     Serial.println("Starting drawer open.");
     Serial.print("Confirming motor relay forward... ");
     if (motorForward()){
       Serial.println("OK"); //Motors are in forward relay switching - start open
       Serial.print("Opening the drawer... ");
       startTime = millis();
-      while (analogRead(drawer_sense) > drawer_limit_out && error==false){
+      while (analogRead(drawer_sense) > drawer_out_limit && error==false){
         motion = true;
         digitalWrite(drawer_relay, LOW);
         if ((millis()-startTime) > 10000){
@@ -199,14 +205,14 @@ bool closeDrawer() {
 
 bool lowerLift() {
   //Confirm the lift isn't lowered already
-  if (analogRead(lift_sense)<lift_limit_in){
+  if (analogRead(lift_sense)<lift_up_limit){
     Serial.println("Starting lift lower.");
     Serial.print("Confirming motors in forward...");
     if (motorForward()){
       Serial.println ("OK"); //Motors are forward start lowering the lift
       Serial.print("Lowering the lift... ");
       startTime = millis();
-      while (analogRead(lift_sense) > lift_limit_out && error==false){
+      while (analogRead(lift_sense) > lift_down_limit && error==false){
         digitalWrite(lift_relay, LOW);
                 if ((millis()-startTime) > 10000){
           liftTimeout();
@@ -263,6 +269,8 @@ void liftTimeout() {
   //MAY NEED TO ADD TIMER REENABLE HERE
 }
 
+
+
 //-------------------------------------CALIBRATION CODE STARTS HERE--------------------->
 void calibrate() {
   Serial.println("CURRENT SENSOR LIMITS:");
@@ -276,17 +284,17 @@ void calibrate() {
  
   Serial.print("Drawer:");
   Serial.print("\t");
-  Serial.print(drawer_limit_out);
+  Serial.print(drawer_out_limit);
   Serial.print("\t");
-  Serial.print(drawer_limit_in);
+  Serial.print(drawer_in_limit);
   Serial.print("\t");
   Serial.println(analogRead(drawer_sense));
   
   Serial.print("Lift:");
   Serial.print("\t");
-  Serial.print(lift_limit_out);
+  Serial.print(lift_down_limit);
   Serial.print("\t");
-  Serial.print(lift_limit_in);
+  Serial.print(lift_up_limit);
   Serial.print("\t");
   Serial.println(analogRead(lift_sense));
   Serial.println("------------------------------");
@@ -331,12 +339,12 @@ void calibrateDrawer(){
     //Wait for input
     while(!Serial.available()) { }
     incomingByte = Serial.read();
-    if(incomingByte==114 && lift_limit_in != 0) {
+    if((incomingByte==114) && (lift_up_limit != 0)) {
       if(!raiseLift()) {
         return;
       } 
       
-    } else if (incomingByte==114 && lift_limit_in==0){
+    } else if (incomingByte==114 && lift_up_limit==0){
       Serial.println("Unable to raise the lift because it hasn't been calibrated yet. You can calibrate the lift first, raise it manually, or re-execute drawer calibration and ignore the warning.");
       delay(300);
       Serial.println("");
@@ -358,12 +366,12 @@ void calibrateDrawer(){
 
   //Calibration selection start - start with parsing the open or close selections and then loop the open/close and save code until they exit
   if(incomingByte==111){ // o for the open limit
-    Serial.println("\nReady to open the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.");
+    Serial.println("\nReady to open the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.\n");
     do {
       Serial.print("Current sensor reading: ");
       Serial.println(analogRead(drawer_sense));
-      Serial.println("[o]pen drawer, [s]ave current reading, any other key to cancel.");
-      while(Serial.available() == 0) { }
+      Serial.println("\n[o]pen drawer, [s]ave current reading, any other key to cancel.");
+      while(!Serial.available()) { }
       incomingByte = Serial.read();
       if(incomingByte==111){ // o for open the drawer
         // Open the drawer
@@ -372,33 +380,29 @@ void calibrateDrawer(){
         if (motorForward()){
           Serial.println("OK"); //Motors are in forward relay switching - start open
           Serial.print("Opening the drawer... ");
+          while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
           delay(300);
           startTime = millis();
-          while (!Serial.available()){
-            motion = true;
+          while (!Serial.available()){ //DRAWER CALIBRATION OPEN MOVEMENT
             digitalWrite(drawer_relay, LOW);
-            if ((millis()-startTime) > 10000){
-              drawerTimeout();
-              return;
-            }
             Serial.print(analogRead(drawer_sense));
             Serial.println(" PRESS ANY KEY TO STOP");
           }
+          //DRAWER STOP HERE
           digitalWrite(drawer_relay, HIGH);
-          motion = false;
+          Serial.println("\nDrawer Stopped - Pausing 2 seconds...\n");
+          while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
         
         } else {
           Serial.println("ERROR: Motor direction control failure.");
           return;
         }
-        delay(300);
+        delay(3000);
         // Go back to the top of the do
         
       } else if(incomingByte==115){ //s for save the current reading
-        drawer_limit_out == analogRead(drawer_sense);
-        EEPROM.write(drawer_limit_out, 1);
-        Serial.println("New drawer out limit SAVED!");
-        delay(300);
+        drawer_out_limit = analogRead(drawer_sense);
+        saveLimit(drawer_out, drawer_out_limit);
         return;
       } else {
         return;
@@ -422,31 +426,28 @@ void calibrateDrawer(){
         if (motorReverse()){
           Serial.println("OK"); //Motors are in reverse relay switching - start close
           Serial.print("Closing the drawer... ");
+          while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
+          delay(300);
           startTime = millis();
-          while (Serial.available()==0){
-            motion = true;
+          while (!Serial.available()){ //DRAWER CALIBRATION CLOSE MOVEMENT
             digitalWrite(drawer_relay, LOW);
-            if ((millis()-startTime) > 10000){
-              drawerTimeout();
-              return;
-            }
             Serial.print(analogRead(drawer_sense));
             Serial.println(" PRESS ANY KEY TO STOP");
           }
+          //DRAWER STOP HERE
           digitalWrite(drawer_relay, HIGH);
+          Serial.println("\nDrawer Stopped - Pausing 2 seconds...\n");
+          while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
         
         } else {
           Serial.println("ERROR: Motor direction control failure.");
           return;
         }
-        delay(300);
+        delay(3000);
         // Go back to the top of the do
-        
       } else if(incomingByte==115){ //s for save the current reading
-        drawer_limit_in == analogRead(drawer_sense);
-        EEPROM.write(drawer_limit_out, 0);
-        Serial.println("New drawer in limit SAVED!");
-        delay(300);
+        drawer_in_limit = analogRead(drawer_sense);
+        saveLimit(drawer_in, drawer_in_limit);
         return;
       } else {
         return;
@@ -467,12 +468,61 @@ void calibrateLift(){
 }
 
 void cancelMotion(){
-  digitalWrite(drawer_relay, HIGH);
-  digitalWrite(lift_relay, HIGH);
-  //Determine if motion was indeed canceled and pause to prevent mechanical damage
-  if (motion == true){
-    Serial.println("CANCELED");
-    delay(3000); 
+  if((digitalRead(drawer_relay)==LOW)||(digitalRead(lift_relay)==LOW)){
+    digitalWrite(drawer_relay, HIGH);
+    digitalWrite(lift_relay, HIGH);
+    Serial.println("\nMOTION CANCELED\n");
+    delay(3000); //Prevent damage from moving parts
   }
 }
+
+//-----------------------------SAVING AND RETURNING LIMIT VALUES FROM EEPROM-------------------->
+
+bool saveLimit(int limit, int value){ //CODE TO SAVE THE APPROPRIATE EEPROM VALUES
+  value = value/3;
+  switch (limit) {
+    case 0: {
+      EEPROM.write(0, value);
+      Serial.print("\nNew lift down limit saved\n"); delay(3000); return true;
+    }
+    break;
+    case 1: {
+      EEPROM.write(1, value);
+      Serial.print("\nNew lift up limit saved\n"); delay(3000); return true;
+    }
+    break;
+    case 2: {
+      EEPROM.write(2, value);
+      Serial.print("\nNew drawer open limit saved\n"); delay(3000); return true;
+    }
+    break;
+    case 3: {
+      EEPROM.write(3, value);
+      Serial.print("\nNew drawer close limit saved\n"); delay(3000); return true;
+    }
+    break;
+  }
+  Serial.println("\nERROR SAVING LIMIT\n");
+  return false;
+}
+
+int getLimit(int limit){ //CODE TO RETURN THE APPROPRIATE LIMIT
+  switch (limit){
+    case 0: {
+      limit = EEPROM.read(0);
+    }
+    case 1: {
+      limit = EEPROM.read(1);
+    }
+    case 2: {
+      limit = EEPROM.read(2);
+    }
+    case 3: {
+      limit = EEPROM.read(3);
+    }
+  }
+  limit = limit * 3;
+  return limit;
+}
+
 
