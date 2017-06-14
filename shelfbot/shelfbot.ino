@@ -246,28 +246,6 @@ bool lowerLift() {
 bool raiseLift() {
 }
 
-bool motorForward() {
-  digitalWrite(motor_direction_A, LOW);
-  digitalWrite(motor_direction_B, LOW);
-  return true;
-}
-
-bool motorReverse() {
-  digitalWrite(motor_direction_A, HIGH);
-  digitalWrite(motor_direction_B, HIGH);
-  return true;
-}
-
-void drawerTimeout() {
-  error = true;
-  error_code = 1;
-  //MAY NEED TO ADD TIMER REENABLE HERE
-}
-void liftTimeout() {
-  error = true;
-  error_code = 2;
-  //MAY NEED TO ADD TIMER REENABLE HERE
-}
 
 
 
@@ -320,9 +298,7 @@ void calibrate() {
       }
       break;
       case 99: { // c
-        Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [s]ensor calibration, [h]elp");
-        Serial.println("READY");
-        return;
+        returnToMain();
       }
       break;
   }
@@ -444,14 +420,6 @@ void calibrateLift(){
   
 }
 
-void cancelMotion(){
-  if((digitalRead(drawer_relay)==LOW)||(digitalRead(lift_relay)==LOW)){
-    digitalWrite(drawer_relay, HIGH);
-    digitalWrite(lift_relay, HIGH);
-    Serial.println("\nMOTION CANCELED\n");
-    delay(3000); //Prevent damage from moving parts
-  }
-}
 
 //-----------------------------SAVING AND RETURNING LIMIT VALUES FROM EEPROM-------------------->
 
@@ -479,7 +447,7 @@ bool saveLimit(int limit, int value){ //CODE TO SAVE THE APPROPRIATE EEPROM VALU
     }
     break;
   }
-  Serial.println("\nERROR SAVING LIMIT\n");
+  Serial.println("\nERROR SAVING LIMIT: This shouldn't happen.\n");
   return false;
 }
 
@@ -500,6 +468,49 @@ int getLimit(int limit){ //CODE TO RETURN THE APPROPRIATE LIMIT
   }
   limit = limit * 3;
   return limit;
+}
+
+// -------------------------------Error functions and exit to main menu functions------------------------------------------------------->
+
+void returnToMain(){
+  cancelMotion();
+  Serial.print("\nListening for state change on interrupt PIN ");
+  Serial.println(request);
+  Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [s]ensor calibration, [h]elp");
+  Serial.println("READY");
+  loop();
+}
+
+bool motorForward() {
+  digitalWrite(motor_direction_A, LOW);
+  digitalWrite(motor_direction_B, LOW);
+  return true;
+}
+
+bool motorReverse() {
+  digitalWrite(motor_direction_A, HIGH);
+  digitalWrite(motor_direction_B, HIGH);
+  return true;
+}
+
+void drawerTimeout() {
+  error = true;
+  error_code = 1;
+  //MAY NEED TO ADD TIMER REENABLE HERE
+}
+void liftTimeout() {
+  error = true;
+  error_code = 2;
+  //MAY NEED TO ADD TIMER REENABLE HERE
+}
+
+void cancelMotion(){
+  if((digitalRead(drawer_relay)==LOW)||(digitalRead(lift_relay)==LOW)){
+    digitalWrite(drawer_relay, HIGH);
+    digitalWrite(lift_relay, HIGH);
+    Serial.println("\nMOTION CANCELED\n");
+    delay(3000); //Prevent damage from moving parts
+  }
 }
 
 
