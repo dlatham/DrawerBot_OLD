@@ -331,31 +331,7 @@ void calibrate() {
 
 //-------------------DRAWER CALIBRATION---------------------->
 void calibrateDrawer(){
-  //First check to see if the lift is down and see if we want to raise it or calibrate that first
-  if(analogRead(lift_sense) < 200) { //less than somewhere around 2.5v on the sense pin
-    Serial.println("WARNING: It appears as though the lift is down so moving the drawer could cause damage.");
-    Serial.println("[r]aise the lift, [c]ontinue with drawer calibration, any other key to cancel.");
-    
-    //Wait for input
-    while(!Serial.available()) { }
-    incomingByte = Serial.read();
-    if((incomingByte==114) && (lift_up_limit != 0)) {
-      if(!raiseLift()) {
-        return;
-      } 
-      
-    } else if (incomingByte==114 && lift_up_limit==0){
-      Serial.println("Unable to raise the lift because it hasn't been calibrated yet. You can calibrate the lift first, raise it manually, or re-execute drawer calibration and ignore the warning.");
-      delay(300);
-      Serial.println("");
-      return;
-    } else if (incomingByte==99){
-      Serial.println("WARNING, WARNING: You are choosing to move the drawer despite the sensors measuring the lift as being down. This could cause damage.");
-    } else {
-      return;
-    }
-  }
-
+  
   //Select order of calibration
   Serial.println("\nNOTICE: Please confirm the lift is up and it is safe to move the drawer.");
   Serial.println("Set the drawer [o]pen limit, [c]losed limit or any other key to cancel.");
@@ -370,20 +346,20 @@ void calibrateDrawer(){
     do {
       Serial.print("Current sensor reading: ");
       Serial.println(analogRead(drawer_sense));
-      Serial.println("\n[o]pen drawer, [s]ave current reading, any other key to cancel.");
+      Serial.println("[o]pen drawer, [s]ave current reading, any other key to cancel.");
       while(!Serial.available()) { }
       incomingByte = Serial.read();
       if(incomingByte==111){ // o for open the drawer
         // Open the drawer
-        Serial.println("\nStarting drawer open.");
-        Serial.print("Confirming motor relay forward... ");
+        Serial.println("\nStarting drawer open...");
+        delay(3000);
         if (motorForward()){
-          Serial.println("OK"); //Motors are in forward relay switching - start open
-          Serial.print("Opening the drawer... ");
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
-          delay(300);
           startTime = millis();
           while (!Serial.available()){ //DRAWER CALIBRATION OPEN MOVEMENT
+            if((millis()-startTime)>10000){
+              drawerTimeout();
+            }
             digitalWrite(drawer_relay, LOW);
             Serial.print(analogRead(drawer_sense));
             Serial.println(" PRESS ANY KEY TO STOP");
@@ -394,7 +370,7 @@ void calibrateDrawer(){
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
         
         } else {
-          Serial.println("ERROR: Motor direction control failure.");
+          Serial.println("\n The motor direction forward function failed (this shouldn't happen).\n\n");
           return;
         }
         delay(3000);
@@ -412,24 +388,24 @@ void calibrateDrawer(){
 
   
   } else if(incomingByte==99){ // c for setting the closed drawer limit
-    Serial.println("Ready to close the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.");
+    Serial.println("\nReady to close the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.\n");
     do {
       Serial.print("Current sensor reading: ");
       Serial.println(analogRead(drawer_sense));
-      Serial.println("[c]lose drawer, [s]ave current reading, any other key to cancel");
-      while(Serial.available() == 0) { }
+      Serial.println("[c]lose drawer, [s]ave current reading, any other key to cancel.");
+      while(!Serial.available()) { }
       incomingByte = Serial.read();
       if(incomingByte==99){ // c for close the drawer
-        // Close the drawer
-        Serial.println("Starting drawer close.");
-        Serial.print("Confirming motor relay reverse... ");
+        // Clsoe the drawer
+        Serial.println("\nStarting drawer close...");
+        delay(3000);
         if (motorReverse()){
-          Serial.println("OK"); //Motors are in reverse relay switching - start close
-          Serial.print("Closing the drawer... ");
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
-          delay(300);
           startTime = millis();
           while (!Serial.available()){ //DRAWER CALIBRATION CLOSE MOVEMENT
+            if((millis()-startTime)>10000){
+              drawerTimeout();
+            }
             digitalWrite(drawer_relay, LOW);
             Serial.print(analogRead(drawer_sense));
             Serial.println(" PRESS ANY KEY TO STOP");
@@ -440,11 +416,12 @@ void calibrateDrawer(){
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
         
         } else {
-          Serial.println("ERROR: Motor direction control failure.");
+          Serial.println("\n The motor direction reverse function failed (this shouldn't happen).\n\n");
           return;
         }
         delay(3000);
         // Go back to the top of the do
+        
       } else if(incomingByte==115){ //s for save the current reading
         drawer_in_limit = analogRead(drawer_sense);
         saveLimit(drawer_in, drawer_in_limit);
