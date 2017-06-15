@@ -156,12 +156,10 @@ bool openDrawer() {
   // Confirm the drawer isn't out first
   if (digitalRead(analogRead(drawer_sense)<drawer_in_limit)){
     Serial.println("Starting drawer open.");
-    Serial.print("Confirming motor relay forward... ");
     if (motorForward()){
-      Serial.println("OK"); //Motors are in forward relay switching - start open
       Serial.print("Opening the drawer... ");
       startTime = millis();
-      while (analogRead(drawer_sense) > drawer_out_limit && error==false){
+      while (analogRead(drawer_sense) > drawer_out_limit){
         motion = true;
         digitalWrite(drawer_relay, LOW);
         if ((millis()-startTime) > 10000){
@@ -169,28 +167,12 @@ bool openDrawer() {
         }
       }
       digitalWrite(drawer_relay, HIGH);
-      if (error == true){
-        Serial.println ("ERROR 1");
-        //Pause for 2 seconds before telling the interrupt that motion stopped (just in case)
-        delay(2000);
-        motion = false;
-        return false;
-      } else {
-        Serial.print("OK - Completed in ");
-        stopTime = millis() - startTime;
-        Serial.print(stopTime/1000);
-        Serial.println("sec");
-        //Pause for 2 seconds before telling the interrupt that motion stopped (just in case)
-        delay(2000);
-        motion = false;
-        return true;
-      }
+      Serial.print("OK - Completed in ");
+      stopTime = millis() - startTime;
+      Serial.print(stopTime/1000);
+      Serial.println("sec");
+      return true;
       
-    } else {
-      error = true;
-      error_code = 3;
-      Serial.println("ERROR 3");
-      return false;
     }
     
   } else {
@@ -207,34 +189,22 @@ bool lowerLift() {
   //Confirm the lift isn't lowered already
   if (analogRead(lift_sense)<lift_up_limit){
     Serial.println("Starting lift lower.");
-    Serial.print("Confirming motors in forward...");
     if (motorForward()){
-      Serial.println ("OK"); //Motors are forward start lowering the lift
       Serial.print("Lowering the lift... ");
       startTime = millis();
-      while (analogRead(lift_sense) > lift_down_limit && error==false){
+      while (analogRead(lift_sense) > lift_down_limit){
         digitalWrite(lift_relay, LOW);
-                if ((millis()-startTime) > 10000){
-          liftTimeout();
+          if ((millis()-startTime) > 10000){
+            liftTimeout();
+          }
         }
-      }
       digitalWrite(lift_relay, HIGH);
-      if (error == true){
-        Serial.println ("ERROR 2");
-        return false;
-      } else {
-        Serial.print("OK - Completed in ");
-        stopTime = millis() - startTime;
-        Serial.print(stopTime/1000);
-        Serial.println("sec");
-        return true;
-      }
+      Serial.print("OK - Completed in ");
+      stopTime = millis() - startTime;
+      Serial.print(stopTime/1000);
+      Serial.println("sec");
+      return true;
       
-    } else {
-      error = true;
-      error_code = 3;
-      Serial.println("ERROR 3");
-      return false;
     }
     
   } else {
@@ -474,7 +444,8 @@ int getLimit(int limit){ //CODE TO RETURN THE APPROPRIATE LIMIT
 
 void returnToMain(){
   cancelMotion();
-  Serial.print("\nListening for state change on interrupt PIN ");
+  Serial.println("\n\n--------------------");
+  Serial.print("Listening for state change on interrupt PIN ");
   Serial.println(request);
   Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [s]ensor calibration, [h]elp");
   Serial.println("READY");
@@ -484,24 +455,28 @@ void returnToMain(){
 bool motorForward() {
   digitalWrite(motor_direction_A, LOW);
   digitalWrite(motor_direction_B, LOW);
+  Serial.println("Motor direction relays set in the forward position.");
   return true;
 }
 
 bool motorReverse() {
   digitalWrite(motor_direction_A, HIGH);
   digitalWrite(motor_direction_B, HIGH);
+  Serial.println("Motor direction relays set in the reverse position.");
   return true;
 }
 
 void drawerTimeout() {
-  error = true;
-  error_code = 1;
-  //MAY NEED TO ADD TIMER REENABLE HERE
+  cancelMotion();
+  Serial.println("\nERROR: The drawer timed out. Please check the mechanics and try again.");
+  delay(3000);
+  returnToMain();
 }
 void liftTimeout() {
-  error = true;
-  error_code = 2;
-  //MAY NEED TO ADD TIMER REENABLE HERE
+  cancelMotion();
+  Serial.println("\nERROR: The lift timed out. Please check the mechanics and try again.");
+  delay(3000);
+  returnToMain();
 }
 
 void cancelMotion(){
