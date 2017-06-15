@@ -15,18 +15,17 @@ int motor_direction_B = 5;
 int drawer_relay = 6;
 int lift_relay = 7;
 //INPUT PINS
-int drawer_sense = A0;
-int lift_sense = A1;
+int drawer_sense = A0;  //Set to the pin where the drawer sense wire is connected
+int lift_sense = A1;  //Set to the pin where the lift sense wire is connected
 int left_weight = 13;
 int right_weight = 14;
 //VARIABLES
+int drawer_timeout = 10000; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
+int lift_timeout = 10000; //Set the timeout of the lift in milliseconds
 volatile int state = LOW;
 bool error = false;
 int error_code = 0;
 int incomingByte = 0; //Incoming serial data
-int drawerTimer;
-int liftTimer;
-bool motion = false;
 int startTime;
 int stopTime;
 
@@ -164,7 +163,7 @@ bool openDrawer() {
         Serial.print(analogRead(drawer_sense));
         Serial.print(" / ");
         Serial.println(drawer_out_limit);
-        if ((millis()-startTime) > 10000){
+        if ((millis()-startTime) > drawer_timeout){
           drawerTimeout();
         }
       }
@@ -199,7 +198,7 @@ bool lowerLift() {
         Serial.print(analogRead(lift_sense));
         Serial.print(" / ");
         Serial.println(lift_down_limit);
-          if ((millis()-startTime) > 10000){
+          if ((millis()-startTime) > lift_timeout){
             liftTimeout();
           }
         }
@@ -308,7 +307,7 @@ void calibrateDrawer(){
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
           startTime = millis();
           while (!Serial.available()){ //DRAWER CALIBRATION OPEN MOVEMENT
-            if((millis()-startTime)>10000){
+            if((millis()-startTime)>drawer_timeout){
               drawerTimeout();
             }
             digitalWrite(drawer_relay, LOW);
@@ -354,7 +353,7 @@ void calibrateDrawer(){
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
           startTime = millis();
           while (!Serial.available()){ //DRAWER CALIBRATION CLOSE MOVEMENT
-            if((millis()-startTime)>10000){
+            if((millis()-startTime)>drawer_timeout){
               drawerTimeout();
             }
             digitalWrite(drawer_relay, LOW);
@@ -418,7 +417,7 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
           startTime = millis();
           while (!Serial.available()){ //LIFT CALIBRATION LOWER MOTION
-            if((millis()-startTime)>10000){
+            if((millis()-startTime)>lift_timeout){
               liftTimeout();
             }
             digitalWrite(lift_relay, LOW);
@@ -464,7 +463,7 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
           startTime = millis();
           while (!Serial.available()){ //LIFT CALIBRATION RAISE MOVEMENT
-            if((millis()-startTime)>10000){
+            if((millis()-startTime)>lift_timeout){
               liftTimeout();
             }
             digitalWrite(lift_relay, LOW);
