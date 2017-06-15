@@ -390,10 +390,118 @@ void calibrateDrawer(){
 }
 
 //-----------------LIFT CALIBRATION------------------>
-void calibrateLift(){
-//LETS GET THIS RIGHT FOR DRAWER AND THEN COPY THE CODE HERE
+void calibrateLift(){ // this code was copied from the drawer calibration code which serves as the source of truth
+
+
+  //Select order of calibration
+  Serial.println("\nNOTICE: Please confirm the drawer is open and it's safe to move the lift.");
+  Serial.println("Set the lift [d]own limit, [r]aised limit or any other key to cancel.");
+
+  //Wait for input
+  while(Serial.available() == 0) { }
+  incomingByte = Serial.read();
+
+  //Calibration selection start - start with parsing the down or up selections and then loop the down/up and save code until they exit
+  if(incomingByte==100){ // d for the down limit
+    Serial.println("\nReady to lower the lift. The monitor will stream the lift sensor reading. PRESS ANY KEY TO STOP THE LIFT.\n");
+    do {
+      Serial.print("Current sensor reading: ");
+      Serial.println(analogRead(lift_sense));
+      Serial.println("[l]lower lift, [s]ave current reading, any other key to cancel.");
+      while(!Serial.available()) { }
+      incomingByte = Serial.read();
+      if(incomingByte==108){ // l for lower the lift
+        // Lower the lift
+        Serial.println("\nStarting lift lower...");
+        delay(3000);
+        if (motorForward()){
+          while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
+          startTime = millis();
+          while (!Serial.available()){ //LIFT CALIBRATION LOWER MOTION
+            if((millis()-startTime)>10000){
+              liftTimeout();
+            }
+            digitalWrite(lift_relay, LOW);
+            Serial.print(analogRead(lift_sense));
+            Serial.println(" PRESS ANY KEY TO STOP");
+          }
+          //LIFT STOP HERE
+          digitalWrite(lift_relay, HIGH);
+          Serial.println("\nLift Stopped - Pausing 2 seconds...\n");
+          while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
+        
+        } else {
+          Serial.println("\n The motor direction forward function failed (this shouldn't happen).\n\n");
+          return;
+        }
+        delay(3000);
+        // Go back to the top of the do
+        
+      } else if(incomingByte==115){ //s for save the current reading
+        lift_down_limit = analogRead(lift_sense);
+        saveLimit(lift_down, lift_down_limit);
+        return;
+      } else {
+        return;
+      }
+    
+    } while(2>1);
+
+  
+  } else if(incomingByte==114){ // r for setting the raised lift limit
+    Serial.println("\nReady to raise the lift. The monitor will stream the lift sensor reading. PRESS ANY KEY TO STOP THE LIFT.\n");
+    do {
+      Serial.print("Current sensor reading: ");
+      Serial.println(analogRead(lift_sense));
+      Serial.println("[r]aise lift, [s]ave current reading, any other key to cancel.");
+      while(!Serial.available()) { }
+      incomingByte = Serial.read();
+      if(incomingByte==114){ // r for raise the lift
+        // Raise the lift
+        Serial.println("\nStarting lift raise...");
+        delay(3000);
+        if (motorReverse()){
+          while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
+          startTime = millis();
+          while (!Serial.available()){ //LIFT CALIBRATION RAISE MOVEMENT
+            if((millis()-startTime)>10000){
+              liftTimeout();
+            }
+            digitalWrite(lift_relay, LOW);
+            Serial.print(analogRead(lift_sense));
+            Serial.println(" PRESS ANY KEY TO STOP");
+          }
+          //LIFT STOP HERE
+          digitalWrite(lift_relay, HIGH);
+          Serial.println("\nLift Stopped - Pausing 2 seconds...\n");
+          while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
+        
+        } else {
+          Serial.println("\n The motor direction reverse function failed (this shouldn't happen).\n\n");
+          return;
+        }
+        delay(3000);
+        // Go back to the top of the do
+        
+      } else if(incomingByte==115){ //s for save the current reading
+        lift_up_limit = analogRead(lift_sense);
+        saveLimit(lift_up, lift_up_limit);
+        return;
+      } else {
+        return;
+      }
+    
+    } while(2>1);
+
+    
+  }
+  
   
 }
+
+
+  
+
 
 
 //-----------------------------SAVING AND RETURNING LIMIT VALUES FROM EEPROM-------------------->
