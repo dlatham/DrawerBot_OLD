@@ -157,11 +157,13 @@ bool openDrawer() {
   if (digitalRead(analogRead(drawer_sense)<drawer_in_limit)){
     Serial.println("Starting drawer open.");
     if (motorForward()){
-      Serial.print("Opening the drawer... ");
+      Serial.println("Opening the drawer... ");
       startTime = millis();
       while (analogRead(drawer_sense) > drawer_out_limit){
-        motion = true;
         digitalWrite(drawer_relay, LOW);
+        Serial.print(analogRead(drawer_sense));
+        Serial.print(" / ");
+        Serial.println(drawer_out_limit);
         if ((millis()-startTime) > 10000){
           drawerTimeout();
         }
@@ -190,10 +192,13 @@ bool lowerLift() {
   if (analogRead(lift_sense)<lift_up_limit){
     Serial.println("Starting lift lower.");
     if (motorForward()){
-      Serial.print("Lowering the lift... ");
+      Serial.println("Lowering the lift... ");
       startTime = millis();
       while (analogRead(lift_sense) > lift_down_limit){
         digitalWrite(lift_relay, LOW);
+        Serial.print(analogRead(lift_sense));
+        Serial.print(" / ");
+        Serial.println(lift_down_limit);
           if ((millis()-startTime) > 10000){
             liftTimeout();
           }
@@ -455,14 +460,14 @@ void returnToMain(){
 bool motorForward() {
   digitalWrite(motor_direction_A, LOW);
   digitalWrite(motor_direction_B, LOW);
-  Serial.println("Motor direction relays set in the forward position.");
+  Serial.println("Motor direction relays set in the forward position... OK");
   return true;
 }
 
 bool motorReverse() {
   digitalWrite(motor_direction_A, HIGH);
   digitalWrite(motor_direction_B, HIGH);
-  Serial.println("Motor direction relays set in the reverse position.");
+  Serial.println("Motor direction relays set in the reverse position... OK");
   return true;
 }
 
@@ -483,7 +488,7 @@ void cancelMotion(){
   if((digitalRead(drawer_relay)==LOW)||(digitalRead(lift_relay)==LOW)){
     digitalWrite(drawer_relay, HIGH);
     digitalWrite(lift_relay, HIGH);
-    Serial.println("\nMOTION CANCELED\n");
+    Serial.println("\nMOTION CANCELED\n\n");
     delay(3000); //Prevent damage from moving parts
   }
 }
