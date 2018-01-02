@@ -19,12 +19,14 @@ int drawer_relay = 6;
 int lift_relay = 7;
 //INPUT PINS
 int drawer_sense = A0;  //Set to the pin where the drawer sense wire is connected
-int lift_sense = A1;  //Set to the pin where the lift sense wire is connected
+int lift_sense = A1;    //Set to the pin where the lift sense wire is connected
 int left_weight = 13;
 int right_weight = 14;
 //VARIABLES
 int drawer_timeout = 15000; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
-int lift_timeout = 20000; //Set the timeout of the lift in milliseconds
+int lift_timeout = 20000;   //Set the timeout of the lift in milliseconds
+int sensorPolls = 3;        //The number of times to poll the distance sensors before confirming a distance
+int i = 0;
 volatile int state = LOW;
 bool error = false;
 int error_code = 0;
@@ -161,13 +163,18 @@ bool openDrawer() {
     if (motorForward()){
       Serial.println("Opening the drawer... ");
       startTime = millis();
-      while (analogRead(drawer_sense) > drawer_out_limit){
+      i = 0;
+      while (i<sensorPolls){
         digitalWrite(drawer_relay, LOW);
         Serial.print(analogRead(drawer_sense));
         Serial.print(" / ");
         Serial.println(drawer_out_limit);
         if ((millis()-startTime) > drawer_timeout){
           drawerTimeout();
+          break;
+        }
+        if (analogRead(drawer_sense)>drawer_out_limit){
+          i++;
         }
       }
       digitalWrite(drawer_relay, HIGH);
