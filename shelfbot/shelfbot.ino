@@ -45,10 +45,10 @@ unsigned long stopTime = 0;
  int lift_up = 1;
  int drawer_out = 2;
  int drawer_in = 3;
- int lift_down_limit = EEPROM.read(0);
- int lift_up_limit = EEPROM.read(1);
- int drawer_out_limit = EEPROM.read(2);
- int drawer_in_limit = EEPROM.read(3);
+ uint8_t lift_down_limit = EEPROM.read(0);
+ uint8_t lift_up_limit = EEPROM.read(1);
+ uint8_t drawer_out_limit = EEPROM.read(2);
+ uint8_t drawer_in_limit = EEPROM.read(3);
 
 
 void setup() {
