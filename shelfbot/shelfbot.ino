@@ -6,11 +6,14 @@
  * 22 May 2017
  * --------------------------------------------
  */
-
+#define vers 0.2
 #define on LOW
 #define off HIGH
+#define lift_down_limit_address 0
+#define lift_up_limit_address 1
+#define drawer_out_limit_address 2
+#define drawer_in_limit_address 3
 
-float vers = 0.2;
 int request = 2; //Interupt pin for raise / lower request signals
 //RELAY PINS
 int motor_direction_A = 4;
@@ -47,11 +50,10 @@ unsigned long stopTime = 0;
  int lift_up = 1;
  int drawer_out = 2;
  int drawer_in = 3;
- uint8_t lift_down_limit = EEPROM.read(0);
- uint8_t lift_up_limit = EEPROM.read(1);
- uint8_t drawer_out_limit = EEPROM.read(2);
- uint8_t drawer_in_limit = EEPROM.read(3);
-
+ int lift_down_limit;
+ int lift_up_limit;
+ int drawer_out_limit;
+ int drawer_in_limit;
 
 void setup() {
   // Setup the pins
@@ -74,6 +76,18 @@ void setup() {
   Serial.print("ShelfBot version ");
   Serial.println(vers);
   Serial.println("--------------------");
+  Serial.println("Retreiving sensor calibration limits from EEPROM...");
+  int lift_down_limit = getLimit(lift_down_limit_address);
+  Serial.print(lift_down_limit, ", ");
+  int lift_up_limit = getLimit(lift_up_limit_address);
+  Serial.print(lift_up_limit, ", ");
+  int drawer_out_limit = getLimit(drawer_out_limit_address);
+  Serial.print(drawer_out_limit, ", ");
+  int drawer_in_limit = getLimit(drawer_in_limit_address);
+  Serial.println(drawer_in_limit);
+  Serial.println("Done");
+  Serial.println("--------------------");
+  delay(100);
   Serial.print("Listening for state change on interrupt PIN ");
   Serial.println(request);
   Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [s]ensor calibration, [h]elp");
@@ -525,7 +539,7 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
 //-----------------------------SAVING AND RETURNING LIMIT VALUES FROM EEPROM-------------------->
 
 bool saveLimit(int limit, int value){ //CODE TO SAVE THE APPROPRIATE EEPROM VALUES
-  value = value/3;
+  value = value/3; //Divide the value by three in order to save as a byte
   switch (limit) {
     case 0: {
       EEPROM.write(0, value);
