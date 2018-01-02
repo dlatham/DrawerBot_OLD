@@ -7,6 +7,9 @@
  * --------------------------------------------
  */
 
+#define on LOW
+#define off HIGH
+
 float vers = 0.2;
 int request = 2; //Interupt pin for raise / lower request signals
 //RELAY PINS
@@ -20,14 +23,14 @@ int lift_sense = A1;  //Set to the pin where the lift sense wire is connected
 int left_weight = 13;
 int right_weight = 14;
 //VARIABLES
-int drawer_timeout = 10000; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
-int lift_timeout = 10000; //Set the timeout of the lift in milliseconds
+int drawer_timeout = 15000; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
+int lift_timeout = 20000; //Set the timeout of the lift in milliseconds
 volatile int state = LOW;
 bool error = false;
 int error_code = 0;
 int incomingByte = 0; //Incoming serial data
-int startTime;
-int stopTime;
+unsigned long startTime = 0;
+unsigned long stopTime = 0;
 
 
 /*
@@ -273,6 +276,7 @@ void calibrate() {
       break;
       case 99: { // c
         returnToMain();
+        return;
       }
       break;
   }
@@ -309,6 +313,7 @@ void calibrateDrawer(){
           while (!Serial.available()){ //DRAWER CALIBRATION OPEN MOVEMENT
             if((millis()-startTime)>drawer_timeout){
               drawerTimeout();
+              break;
             }
             digitalWrite(drawer_relay, LOW);
             Serial.print(analogRead(drawer_sense));
@@ -355,6 +360,7 @@ void calibrateDrawer(){
           while (!Serial.available()){ //DRAWER CALIBRATION CLOSE MOVEMENT
             if((millis()-startTime)>drawer_timeout){
               drawerTimeout();
+              break;
             }
             digitalWrite(drawer_relay, LOW);
             Serial.print(analogRead(drawer_sense));
@@ -419,6 +425,7 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
           while (!Serial.available()){ //LIFT CALIBRATION LOWER MOTION
             if((millis()-startTime)>lift_timeout){
               liftTimeout();
+              break;
             }
             digitalWrite(lift_relay, LOW);
             Serial.print(analogRead(lift_sense));
@@ -465,6 +472,7 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
           while (!Serial.available()){ //LIFT CALIBRATION RAISE MOVEMENT
             if((millis()-startTime)>lift_timeout){
               liftTimeout();
+              break;
             }
             digitalWrite(lift_relay, LOW);
             Serial.print(analogRead(lift_sense));
@@ -565,15 +573,15 @@ void returnToMain(){
 }
 
 bool motorForward() {
-  digitalWrite(motor_direction_A, LOW);
-  digitalWrite(motor_direction_B, LOW);
+  digitalWrite(motor_direction_A, on);
+  digitalWrite(motor_direction_B, off);
   Serial.println("Motor direction relays set in the forward position... OK");
   return true;
 }
 
 bool motorReverse() {
-  digitalWrite(motor_direction_A, HIGH);
-  digitalWrite(motor_direction_B, HIGH);
+  digitalWrite(motor_direction_A, off);
+  digitalWrite(motor_direction_B, on);
   Serial.println("Motor direction relays set in the reverse position... OK");
   return true;
 }
@@ -582,19 +590,21 @@ void drawerTimeout() {
   cancelMotion();
   Serial.println("\nERROR: The drawer timed out. Please check the mechanics and try again.");
   delay(3000);
-  returnToMain();
+  //returnToMain();
 }
 void liftTimeout() {
   cancelMotion();
   Serial.println("\nERROR: The lift timed out. Please check the mechanics and try again.");
   delay(3000);
-  returnToMain();
+  //returnToMain();
 }
 
 void cancelMotion(){
-  if((digitalRead(drawer_relay)==LOW)||(digitalRead(lift_relay)==LOW)){
-    digitalWrite(drawer_relay, HIGH);
-    digitalWrite(lift_relay, HIGH);
+  if((digitalRead(drawer_relay)==on)||(digitalRead(lift_relay)==on)){
+    digitalWrite(drawer_relay, off);
+    digitalWrite(lift_relay, off);
+    digitalWrite(motor_direction_A, off);
+    digitalWrite(motor_direction_B, off);
     Serial.println("\nMOTION CANCELED\n\n");
     delay(3000); //Prevent damage from moving parts
   }
