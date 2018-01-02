@@ -89,24 +89,28 @@ void loop() {
         cancelMotion();
         Serial.println("Open drawer requested.");
         openDrawer();
+        returnToMain();
       }
       break;
       case 99: {
         cancelMotion();
         Serial.println("Close drawer requested.");
         closeDrawer();
+        returnToMain();
       }
       break;
       case 108: {
         cancelMotion();
         Serial.println("Lower lift requested.");
         lowerLift();
+        returnToMain();
       }
       break;
       case 114: {
         cancelMotion();
         Serial.println("Raise lift requested.");
         raiseLift();
+        returnToMain();
       }
       break;
       case 100: {
