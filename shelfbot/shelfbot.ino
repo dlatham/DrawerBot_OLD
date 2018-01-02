@@ -31,20 +31,11 @@ int lift_timeout = 20000;   //Set the timeout of the lift in milliseconds
 int sensorPolls = 3;        //The number of times to poll the distance sensors before confirming a distance
 int i = 0;
 volatile int state = LOW;
-bool error = false;
-int error_code = 0;
 int incomingByte = 0; //Incoming serial data
 unsigned long startTime = 0;
 unsigned long stopTime = 0;
 
 
-/*
- * ERROR CODES:
- * #1 - Drawer movement timeout
- * #2 - Lift movement timeout.
- * #3 - Motor relay error
- * 
- */
  //STORED EEPROM LIMIT VALUES
  int lift_down = 0;
  int lift_up = 1;
@@ -127,14 +118,6 @@ void loop() {
         returnToMain();
       }
       break;
-      case 100: {
-        if (error = true) {
-          cancelMotion();
-          Serial.println("Error state reset.");
-          error = false;
-        }
-        break;
-      }
       case 115: {
         cancelMotion();
         Serial.println("Sensor calibration requested.");
@@ -324,7 +307,8 @@ void calibrateDrawer(){
     Serial.println("\nReady to open the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.\n");
     do {
       Serial.print("Current sensor reading: ");
-      Serial.println(analogRead(drawer_sense));
+      int value = getSensor(drawer_sense);  // Call the function to check the sensor and store it in a temporary value
+      Serial.println(value);
       Serial.println("[o]pen drawer, [s]ave current reading, any other key to cancel.");
       while(!Serial.available()) { }
       incomingByte = Serial.read();
@@ -346,18 +330,18 @@ void calibrateDrawer(){
           }
           //DRAWER STOP HERE
           digitalWrite(drawer_relay, HIGH);
-          Serial.println("\nDrawer Stopped - Pausing 2 seconds...\n");
+          Serial.println("\nOK\n");
           while(Serial.available()){Serial.read();} //CLEAR THE BUFFER
         
         } else {
           Serial.println("\n The motor direction forward function failed (this shouldn't happen).\n\n");
           return;
         }
-        delay(3000);
+        delay(1000);
         // Go back to the top of the do
         
       } else if(incomingByte==115){ //s for save the current reading
-        drawer_out_limit = analogRead(drawer_sense);
+        drawer_out_limit = value;
         saveLimit(drawer_out, drawer_out_limit);
         return;
       } else {
@@ -536,7 +520,7 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
 
 
 
-//-----------------------------SAVING AND RETURNING LIMIT VALUES FROM EEPROM-------------------->
+//-----------------------------READING, SAVING AND RETURNING LIMIT VALUES FROM SENSORS AND EEPROM-------------------->
 
 bool saveLimit(int limit, int value){ //CODE TO SAVE THE APPROPRIATE EEPROM VALUES
   value = value/3; //Divide the value by three in order to save as a byte
@@ -583,6 +567,22 @@ int getLimit(int limit){ //CODE TO RETURN THE APPROPRIATE LIMIT
   }
   limit = limit * 3;
   return limit;
+}
+
+int getSensor(int pin){ // Poll the pin a specified number of times to ensure it is relatively consistent
+  int i = 0;
+  int value = analogRead(pin);
+  delay(5);
+  while (i<sensorPolls){
+    if (((value - analogRead(pin))>10) || ((value - analogRead(pin))<-10)){ // The value shouldn't be more than 10 points away from the previous reading or it will reset and go again
+      value = analogRead(pin);
+      delay(5);
+    } else {
+      i++;
+      delay(5);
+    }
+  }
+  return value;
 }
 
 // -------------------------------Error functions and exit to main menu functions------------------------------------------------------->
