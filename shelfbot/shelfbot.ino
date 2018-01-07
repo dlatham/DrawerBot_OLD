@@ -1,12 +1,12 @@
 #include <EEPROM.h>
 /*
  * Automated Shelf by Dave Latham
- * Version 0.2 - in-progress
- * This version will substitute the mechanical limit switches for an IR distance sensor and add a calibration routine
+ * Version 0.3 - in-progress
+ * Drawer up and down routines complete with sensor calibration working
  * 22 May 2017
  * --------------------------------------------
  */
-#define vers 0.2
+#define vers 0.3
 #define on LOW
 #define off HIGH
 #define lift_down_limit_address 0
@@ -27,7 +27,7 @@ int left_weight = 13;
 int right_weight = 14;
 //VARIABLES
 int drawer_timeout = 13500; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
-int lift_timeout = 20000;   //Set the timeout of the lift in milliseconds
+int lift_timeout = 21000;   //Set the timeout of the lift in milliseconds
 int sensorPolls = 10;        //The number of times to poll the distance sensors before confirming a distance (higher number = more precise)
 volatile int state = LOW;
 int incomingByte = 0; //Incoming serial data
@@ -68,9 +68,11 @@ void setup() {
   Serial.println("--------------------");
   Serial.println("Retreiving sensor calibration limits from EEPROM...");
   lift_down_limit = getLimit(0);
+  lift_down_limit = 175; //TEMPORARY SO I DON'T HAVE TO SET THE SENSORS EVERY TIME
   Serial.print(lift_down_limit);
   Serial.print(", ");
   lift_up_limit = getLimit(1);
+  lift_up_limit = 470; //TEMPORARY SO I DON'T HAVE TO SET THE SENSORS EVERY TIME
   Serial.print(lift_up_limit);
   Serial.print(", ");
   drawer_out_limit = getLimit(2);
@@ -163,7 +165,7 @@ void requestChange(){
 // Drawer motion controllers start here--------------------------------------------->
 bool openDrawer() {
   // Confirm the drawer isn't out first
-  if (digitalRead(analogRead(drawer_sense)<drawer_in_limit)){
+  if (analogRead(drawer_sense)<drawer_in_limit){
     Serial.println("Starting drawer open.");
     if (motorForward()){
       Serial.println("Opening the drawer... ");
@@ -200,7 +202,7 @@ bool openDrawer() {
 
 bool closeDrawer() {
   // Confirm the drawer isn't in first
-  if (digitalRead(analogRead(drawer_sense)>drawer_in_limit)){
+  if (analogRead(drawer_sense)>drawer_in_limit){
     Serial.println("Starting drawer close.");
     if (motorReverse()){
       Serial.println("Closing the drawer... ");
@@ -235,21 +237,26 @@ bool closeDrawer() {
 }
 
 bool lowerLift() {
-  //Confirm the lift isn't lowered already
-  if (analogRead(lift_sense)<lift_up_limit){
+  // Confirm the lift isn't down first
+  if (analogRead(lift_sense)>lift_down_limit){
     Serial.println("Starting lift lower.");
     if (motorForward()){
       Serial.println("Lowering the lift... ");
       startTime = millis();
-      while (analogRead(lift_sense) > lift_down_limit){
+      int i = 0;
+      while (i<sensorPolls){
         digitalWrite(lift_relay, LOW);
         Serial.print(analogRead(lift_sense));
         Serial.print(" / ");
         Serial.println(lift_down_limit);
-          if ((millis()-startTime) > lift_timeout){
-            liftTimeout();
-          }
+        if ((millis()-startTime) > lift_timeout){
+          liftTimeout();
+          break;
         }
+        if (analogRead(lift_sense)<lift_down_limit){
+          i++;
+        }
+      }
       digitalWrite(lift_relay, HIGH);
       Serial.print("OK - Completed in ");
       stopTime = millis() - startTime;
@@ -260,12 +267,45 @@ bool lowerLift() {
     }
     
   } else {
-    Serial.println("Lift already lowered.");
+    Serial.println("Lift already down.");
     return true;
   }
 }
 
 bool raiseLift() {
+  // Confirm the lift isn't up first
+  if (analogRead(lift_sense)<lift_up_limit){
+    Serial.println("Starting lift raise.");
+    if (motorReverse()){
+      Serial.println("Raising the lift... ");
+      startTime = millis();
+      int i = 0;
+      while (i<sensorPolls){
+        digitalWrite(lift_relay, LOW);
+        Serial.print(analogRead(lift_sense));
+        Serial.print(" / ");
+        Serial.println(lift_up_limit);
+        if ((millis()-startTime) > lift_timeout){
+          liftTimeout();
+          break;
+        }
+        if (analogRead(lift_sense)>lift_up_limit){
+          i++;
+        }
+      }
+      digitalWrite(lift_relay, HIGH);
+      Serial.print("OK - Completed in ");
+      stopTime = millis() - startTime;
+      Serial.print(stopTime/1000);
+      Serial.println("sec");
+      return true;
+      
+    }
+    
+  } else {
+    Serial.println("Lift already up.");
+    return true;
+  }
 }
 
 
@@ -458,7 +498,8 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
     Serial.println("\nReady to lower the lift. The monitor will stream the lift sensor reading. PRESS ANY KEY TO STOP THE LIFT.\n");
     do {
       Serial.print("Current sensor reading: ");
-      Serial.println(analogRead(lift_sense));
+      int value = getSensor(lift_sense);  // Call the function to check the sensor and store it in a temporary value
+      Serial.println(value);
       Serial.println("[l]lower lift, [s]ave current reading, any other key to cancel.");
       while(!Serial.available()) { }
       incomingByte = Serial.read();
@@ -491,7 +532,7 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
         // Go back to the top of the do
         
       } else if(incomingByte==115){ //s for save the current reading
-        lift_down_limit = analogRead(lift_sense);
+        lift_down_limit = value;
         saveLimit(lift_down, lift_down_limit);
         return;
       } else {
@@ -505,7 +546,8 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
     Serial.println("\nReady to raise the lift. The monitor will stream the lift sensor reading. PRESS ANY KEY TO STOP THE LIFT.\n");
     do {
       Serial.print("Current sensor reading: ");
-      Serial.println(analogRead(lift_sense));
+      int value = getSensor(lift_sense);  // Call the function to check the sensor and store it in a temporary value
+      Serial.println(value);
       Serial.println("[r]aise lift, [s]ave current reading, any other key to cancel.");
       while(!Serial.available()) { }
       incomingByte = Serial.read();
@@ -538,7 +580,7 @@ void calibrateLift(){ // this code was copied from the drawer calibration code w
         // Go back to the top of the do
         
       } else if(incomingByte==115){ //s for save the current reading
-        lift_up_limit = analogRead(lift_sense);
+        lift_up_limit = value;
         saveLimit(lift_up, lift_up_limit);
         return;
       } else {
