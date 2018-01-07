@@ -26,10 +26,9 @@ int lift_sense = A1;    //Set to the pin where the lift sense wire is connected
 int left_weight = 13;
 int right_weight = 14;
 //VARIABLES
-int drawer_timeout = 15000; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
+int drawer_timeout = 13500; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
 int lift_timeout = 20000;   //Set the timeout of the lift in milliseconds
-int sensorPolls = 3;        //The number of times to poll the distance sensors before confirming a distance
-int i = 0;
+int sensorPolls = 10;        //The number of times to poll the distance sensors before confirming a distance (higher number = more precise)
 volatile int state = LOW;
 int incomingByte = 0; //Incoming serial data
 unsigned long startTime = 0;
@@ -68,16 +67,18 @@ void setup() {
   Serial.println(vers);
   Serial.println("--------------------");
   Serial.println("Retreiving sensor calibration limits from EEPROM...");
-  int lift_down_limit = getLimit(lift_down_limit_address);
+  lift_down_limit = getLimit(0);
   Serial.print(lift_down_limit);
   Serial.print(", ");
-  int lift_up_limit = getLimit(lift_up_limit_address);
+  lift_up_limit = getLimit(1);
   Serial.print(lift_up_limit);
   Serial.print(", ");
-  int drawer_out_limit = getLimit(drawer_out_limit_address);
+  drawer_out_limit = getLimit(2);
+  drawer_out_limit = 132; //TEMPORARY SO I DON'T HAVE TO SET THE SENSORS EVERY TIME
   Serial.print(drawer_out_limit);
   Serial.print(", ");
-  int drawer_in_limit = getLimit(drawer_in_limit_address);
+  drawer_in_limit = getLimit(3);
+  drawer_in_limit = 676; //TEMPORARY SO I DON'T HAVE TO SET THE SENSORS EVERY TIME
   Serial.println(drawer_in_limit);
   Serial.println("Done");
   Serial.println("--------------------");
@@ -167,7 +168,7 @@ bool openDrawer() {
     if (motorForward()){
       Serial.println("Opening the drawer... ");
       startTime = millis();
-      i = 0;
+      int i = 0;
       while (i<sensorPolls){
         digitalWrite(drawer_relay, LOW);
         Serial.print(analogRead(drawer_sense));
@@ -177,7 +178,7 @@ bool openDrawer() {
           drawerTimeout();
           break;
         }
-        if (analogRead(drawer_sense)>drawer_out_limit){
+        if (analogRead(drawer_sense)<drawer_out_limit){
           i++;
         }
       }
@@ -198,6 +199,39 @@ bool openDrawer() {
 
 
 bool closeDrawer() {
+  // Confirm the drawer isn't in first
+  if (digitalRead(analogRead(drawer_sense)>drawer_in_limit)){
+    Serial.println("Starting drawer close.");
+    if (motorReverse()){
+      Serial.println("Closing the drawer... ");
+      startTime = millis();
+      int i = 0;
+      while (i<sensorPolls){
+        digitalWrite(drawer_relay, LOW);
+        Serial.print(analogRead(drawer_sense));
+        Serial.print(" / ");
+        Serial.println(drawer_in_limit);
+        if ((millis()-startTime) > drawer_timeout){
+          drawerTimeout();
+          break;
+        }
+        if (analogRead(drawer_sense)>drawer_in_limit){
+          i++;
+        }
+      }
+      digitalWrite(drawer_relay, HIGH);
+      Serial.print("OK - Completed in ");
+      stopTime = millis() - startTime;
+      Serial.print(stopTime/1000);
+      Serial.println("sec");
+      return true;
+      
+    }
+    
+  } else {
+    Serial.println("Drawer already closed.");
+    return true;
+  }
 }
 
 bool lowerLift() {
