@@ -69,11 +69,14 @@ void setup() {
   Serial.println("--------------------");
   Serial.println("Retreiving sensor calibration limits from EEPROM...");
   int lift_down_limit = getLimit(lift_down_limit_address);
-  Serial.print(lift_down_limit, ", ");
+  Serial.print(lift_down_limit);
+  Serial.print(", ");
   int lift_up_limit = getLimit(lift_up_limit_address);
-  Serial.print(lift_up_limit, ", ");
+  Serial.print(lift_up_limit);
+  Serial.print(", ");
   int drawer_out_limit = getLimit(drawer_out_limit_address);
-  Serial.print(drawer_out_limit, ", ");
+  Serial.print(drawer_out_limit);
+  Serial.print(", ");
   int drawer_in_limit = getLimit(drawer_in_limit_address);
   Serial.println(drawer_in_limit);
   Serial.println("Done");
@@ -355,12 +358,13 @@ void calibrateDrawer(){
     Serial.println("\nReady to close the drawer. The monitor will stream the drawer sensor reading. PRESS ANY KEY TO STOP THE DRAWER.\n");
     do {
       Serial.print("Current sensor reading: ");
-      Serial.println(analogRead(drawer_sense));
+      int value = getSensor(drawer_sense);  // Call the function to check the sensor and store it in a temporary value
+      Serial.println(value);
       Serial.println("[c]lose drawer, [s]ave current reading, any other key to cancel.");
       while(!Serial.available()) { }
       incomingByte = Serial.read();
       if(incomingByte==99){ // c for close the drawer
-        // Clsoe the drawer
+        // Close the drawer
         Serial.println("\nStarting drawer close...");
         delay(3000);
         if (motorReverse()){
@@ -388,7 +392,7 @@ void calibrateDrawer(){
         // Go back to the top of the do
         
       } else if(incomingByte==115){ //s for save the current reading
-        drawer_in_limit = analogRead(drawer_sense);
+        drawer_in_limit = value;
         saveLimit(drawer_in, drawer_in_limit);
         return;
       } else {
