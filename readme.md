@@ -19,3 +19,9 @@ Versions
 * Added calibration routines to adjust limit distances
 * Better routine management
 * Initial hardware tests
+
+### Version 0.3 (7 January 2018)
+* All motion complete
+* Calibration routine functioning
+* EEPROM save updated but still needs work for reliability
+* Temporary limit values loaded from flash rather than EEPROM
