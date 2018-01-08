@@ -26,7 +26,7 @@ int lift_sense = A1;    //Set to the pin where the lift sense wire is connected
 int left_weight = 13;
 int right_weight = 14;
 //VARIABLES
-int drawer_timeout = 13500; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
+int drawer_timeout = 14000; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
 int lift_timeout = 21000;   //Set the timeout of the lift in milliseconds
 int sensorPolls = 10;        //The number of times to poll the distance sensors before confirming a distance (higher number = more precise)
 volatile int state = LOW;
@@ -76,7 +76,7 @@ void setup() {
   Serial.print(lift_up_limit);
   Serial.print(", ");
   drawer_out_limit = getLimit(2);
-  drawer_out_limit = 132; //TEMPORARY SO I DON'T HAVE TO SET THE SENSORS EVERY TIME
+  drawer_out_limit = 145; //TEMPORARY SO I DON'T HAVE TO SET THE SENSORS EVERY TIME
   Serial.print(drawer_out_limit);
   Serial.print(", ");
   drawer_in_limit = getLimit(3);
@@ -87,7 +87,7 @@ void setup() {
   delay(100);
   Serial.print("Listening for state change on interrupt PIN ");
   Serial.println(request);
-  Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [s]ensor calibration, [h]elp");
+  Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [p]rogram down, program [u]p, [s]ensor calibration, [h]elp");
   Serial.println("READY");
 }
 
@@ -130,6 +130,20 @@ void loop() {
         calibrate();
       }
       break;
+      case 112: {
+        cancelMotion();
+        Serial.println("Lower program requested.");
+        lowerProgram();
+        returnToMain();
+      }
+      break;
+      case 117: {
+        cancelMotion();
+        Serial.println("Raise program requested.");
+        raiseProgram();
+        returnToMain();
+      }
+      break;
       case 104: {
         //ADD HELP CODE HERE
       }
@@ -161,11 +175,35 @@ void requestChange(){
   }
 }
 
+bool lowerProgram(){
+  if(openDrawer()){
+    if(lowerLift()){
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+
+bool raiseProgram(){
+  if(raiseLift()){
+    if(closeDrawer()){
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+
 
 // Drawer motion controllers start here--------------------------------------------->
 bool openDrawer() {
   // Confirm the drawer isn't out first
-  if (analogRead(drawer_sense)<drawer_in_limit){
+  if (analogRead(drawer_sense)>drawer_out_limit){
     Serial.println("Starting drawer open.");
     if (motorForward()){
       Serial.println("Opening the drawer... ");
@@ -178,7 +216,7 @@ bool openDrawer() {
         Serial.println(drawer_out_limit);
         if ((millis()-startTime) > drawer_timeout){
           drawerTimeout();
-          break;
+          return false;
         }
         if (analogRead(drawer_sense)<drawer_out_limit){
           i++;
@@ -195,14 +233,14 @@ bool openDrawer() {
     
   } else {
     Serial.println("Drawer already extended.");
-    return true;
+    return false;
   }
 }
 
 
 bool closeDrawer() {
   // Confirm the drawer isn't in first
-  if (analogRead(drawer_sense)>drawer_in_limit){
+  if (analogRead(drawer_sense)<drawer_in_limit){
     Serial.println("Starting drawer close.");
     if (motorReverse()){
       Serial.println("Closing the drawer... ");
@@ -215,7 +253,7 @@ bool closeDrawer() {
         Serial.println(drawer_in_limit);
         if ((millis()-startTime) > drawer_timeout){
           drawerTimeout();
-          break;
+          return false;
         }
         if (analogRead(drawer_sense)>drawer_in_limit){
           i++;
@@ -232,7 +270,7 @@ bool closeDrawer() {
     
   } else {
     Serial.println("Drawer already closed.");
-    return true;
+    return false;
   }
 }
 
@@ -251,7 +289,7 @@ bool lowerLift() {
         Serial.println(lift_down_limit);
         if ((millis()-startTime) > lift_timeout){
           liftTimeout();
-          break;
+          return false;
         }
         if (analogRead(lift_sense)<lift_down_limit){
           i++;
@@ -268,7 +306,7 @@ bool lowerLift() {
     
   } else {
     Serial.println("Lift already down.");
-    return true;
+    return false;
   }
 }
 
@@ -287,7 +325,7 @@ bool raiseLift() {
         Serial.println(lift_up_limit);
         if ((millis()-startTime) > lift_timeout){
           liftTimeout();
-          break;
+          return false;
         }
         if (analogRead(lift_sense)>lift_up_limit){
           i++;
@@ -304,7 +342,7 @@ bool raiseLift() {
     
   } else {
     Serial.println("Lift already up.");
-    return true;
+    return false;
   }
 }
 
@@ -672,7 +710,7 @@ void returnToMain(){
   Serial.println("\n\n--------------------");
   Serial.print("Listening for state change on interrupt PIN ");
   Serial.println(request);
-  Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [d]ismiss Error, [s]ensor calibration, [h]elp");
+  Serial.println("[o]pen drawer, [c]lose drawer, [l]ower lift, [r]aise lift, [p]rogram down, program [u]p, [s]ensor calibration, [h]elp");
   Serial.println("READY");
   loop();
 }
