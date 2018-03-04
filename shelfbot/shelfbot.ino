@@ -1,24 +1,24 @@
 #include <EEPROM.h>
 /*
  * Automated Shelf by Dave Latham
- * Version 0.2 - in-progress
- * This version will substitute the mechanical limit switches for an IR distance sensor and add a calibration routine
- * 22 May 2017
+ * Version 0.3 - in-progress
+ * This version is finalizing all functionality for initial mechanical tests
+ * 14 June 2017
  * --------------------------------------------
  */
 
-float vers = 0.2;
+float vers = 0.3;
 int request = 2; //Interupt pin for raise / lower request signals
 //RELAY PINS
-int motor_direction_A = 4;
-int motor_direction_B = 5;
+int motor_direction_A = 4; //Drawer
+int motor_direction_B = 5; // Lift
 int drawer_relay = 6;
 int lift_relay = 7;
 //INPUT PINS
 int drawer_sense = A0;  //Set to the pin where the drawer sense wire is connected
 int lift_sense = A1;  //Set to the pin where the lift sense wire is connected
-int left_weight = 13;
-int right_weight = 14;
+int left_weight = 8; //DATA pin from load cell amp
+int right_weight = 9; //CLK pin from load cell amp
 //VARIABLES
 int drawer_timeout = 10000; //Set the timeout of the drawer in milliseconds (1000 milli = 1 second)
 int lift_timeout = 10000; //Set the timeout of the lift in milliseconds
